@@ -18,21 +18,39 @@ def get_all_properties():
 logger = logging.getLogger(__name__)
 
 def get_redis_cache_metrics():
-    redis_conn = get_redis_connection("default")
-    info = redis_conn.info("stats")
-    
-    hits = info.get("keyspace_hits", 0)
-    misses = info.get("keyspace_misses", 0)
-    total = hits + misses
-    
-    hit_ratio = (hits / total) if total > 0 else 0
-    
-    metrics = {
-        "keyspace_hits": hits,
-        "keyspace_misses": misses,
-        "hit_ratio": hit_ratio,
-    }
-    
-    logger.info(f"Redis Cache Metrics: Hits={hits}, Misses={misses}, Hit Ratio={hit_ratio:.2f}")
-    
-    return metrics
+    try:
+        redis_conn = get_redis_connection("default")
+        info = redis_conn.info("stats")
+
+        hits = info.get("keyspace_hits", 0)
+        misses = info.get("keyspace_misses", 0)
+        total = hits + misses
+
+        # Straight division, might raise ZeroDivisionError if total=0
+        hit_ratio = hits / total
+
+        metrics = {
+            "keyspace_hits": hits,
+            "keyspace_misses": misses,
+            "hit_ratio": hit_ratio,
+        }
+
+        logger.info(f"Redis Cache Metrics: Hits={hits}, Misses={misses}, Hit Ratio={hit_ratio:.2f}")
+
+        return metrics
+
+    except ZeroDivisionError:
+        logger.error("Total Redis requests is zero; cannot calculate hit ratio.")
+        return {
+            "keyspace_hits": 0,
+            "keyspace_misses": 0,
+            "hit_ratio": 0,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting Redis cache metrics: {e}")
+        return {
+            "keyspace_hits": 0,
+            "keyspace_misses": 0,
+            "hit_ratio": 0,
+        }
